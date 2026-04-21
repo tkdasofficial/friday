@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "_VaBqLsFe1ZN9pFsCc6PR"
+uri = "file://artifacts/friday/assets/images/icon.png"
+type = "image"
+title = "friday ai voicebot icon"

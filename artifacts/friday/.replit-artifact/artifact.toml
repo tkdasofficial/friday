@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "FRIDAY - AI VoiceBot"
+version = "1.0.0"
+id = "artifacts/friday"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 24291
+
+[services.development]
+run = "pnpm --filter @workspace/friday run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/friday", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/friday", "run", "serve" ]
+
+[services.env]
+PORT = "24291"
+BASE_PATH = "/"
