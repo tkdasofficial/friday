@@ -2,6 +2,7 @@
   "expo": {
     "name": "FRIDAY",
     "slug": "friday",
+    "owner": "friday-assistant",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -77,6 +78,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "88530a6e-b8f4-4d37-bbb6-9874be1afd7b"
+      }
     }
   }
 }
