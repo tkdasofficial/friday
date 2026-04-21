@@ -24,6 +24,25 @@ import { executeAction, parseCommand } from "@/utils/deviceActions";
 import { speak, stopSpeaking } from "@/utils/speechEngine";
 import { processOffline } from "@/utils/offlineAI";
 import { chatCompletion } from "@/utils/openaiClient";
+import {
+  startEngine,
+  stopEngine,
+  addVoiceListener,
+  switchToCommandMode,
+  switchToWakeWordMode,
+  getCurrentMode,
+  updateWakeWords,
+} from "@/utils/voiceEngine";
+import {
+  activateKeepAwake,
+  deactivateKeepAwake,
+  dismissPersistentNotification,
+  registerBackgroundTask,
+  requestNotificationPermission,
+  setupNotificationChannel,
+  showPersistentNotification,
+  updatePersistentNotification,
+} from "@/utils/backgroundService";
 
 export type FridayStatus =
   | "idle"
@@ -31,69 +50,61 @@ export type FridayStatus =
   | "processing"
   | "speaking"
   | "error"
-  | "offline";
+  | "off";
 
-export interface TaskExecution {
-  id: string;
-  description: string;
-  type: string;
-  status: "pending" | "running" | "done" | "failed";
-  timestamp: number;
-}
+export type ListeningMode = "wake_word" | "command" | "off";
 
 interface FridayContextValue {
   settings: FridaySettings;
-  history: ConversationEntry[];
   status: FridayStatus;
+  listeningMode: ListeningMode;
   isActive: boolean;
   isOnline: boolean;
-  currentTranscript: string;
+  lastTranscript: string;
   lastResponse: string;
   error: string | null;
-  currentTask: TaskExecution | null;
-  backgroundMode: boolean;
+  isSetupComplete: boolean;
 
   updateSettings: (updates: Partial<FridaySettings>) => Promise<void>;
   addCustomCommand: (cmd: Omit<CustomCommand, "id">) => Promise<void>;
   removeCustomCommand: (id: string) => Promise<void>;
-  processTextCommand: (text: string) => Promise<void>;
-  clearConversationHistory: () => Promise<void>;
-  setActive: (active: boolean) => void;
-  setCurrentTranscript: (text: string) => void;
-  setStatus: (status: FridayStatus) => void;
-  setError: (error: string | null) => void;
-  setBackgroundMode: (v: boolean) => void;
-  stopAll: () => void;
+  startFriday: () => Promise<void>;
+  stopFriday: () => Promise<void>;
+  clearError: () => void;
+  markSetupComplete: () => Promise<void>;
 }
 
 const FridayContext = createContext<FridayContextValue | null>(null);
 
 export function FridayProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<FridaySettings>(DEFAULT_SETTINGS);
-  const [history, setHistory] = useState<ConversationEntry[]>([]);
-  const [status, setStatus] = useState<FridayStatus>("idle");
-  const [isActive, setIsActiveState] = useState(false);
+  const [status, setStatus] = useState<FridayStatus>("off");
+  const [listeningMode, setListeningMode] = useState<ListeningMode>("off");
+  const [isActive, setIsActive] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [lastTranscript, setLastTranscript] = useState("");
   const [lastResponse, setLastResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [currentTask, setCurrentTask] = useState<TaskExecution | null>(null);
-  const [backgroundMode, setBackgroundModeState] = useState(false);
+  const [isSetupComplete, setIsSetupComplete] = useState(false);
+  const settingsRef = useRef<FridaySettings>(DEFAULT_SETTINGS);
+  const isBusyRef = useRef(false);
   const historyRef = useRef<ConversationEntry[]>([]);
 
   useEffect(() => {
-    historyRef.current = history;
-  }, [history]);
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     async function init() {
+      await setupNotificationChannel();
       const [loadedSettings, loadedHistory] = await Promise.all([
         loadSettings(),
         loadHistory(),
       ]);
       setSettings(loadedSettings);
-      setHistory(loadedHistory);
+      settingsRef.current = loadedSettings;
       historyRef.current = loadedHistory;
+      setIsSetupComplete(loadedSettings.setupComplete ?? false);
     }
     init();
   }, []);
@@ -105,43 +116,6 @@ export function FridayProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
-  const updateSettings = useCallback(
-    async (updates: Partial<FridaySettings>) => {
-      setSettings((prev) => {
-        const newSettings = { ...prev, ...updates };
-        saveSettings(newSettings);
-        return newSettings;
-      });
-    },
-    []
-  );
-
-  const addCustomCommand = useCallback(
-    async (cmd: Omit<CustomCommand, "id">) => {
-      const newCmd: CustomCommand = { ...cmd, id: generateId() };
-      setSettings((prev) => {
-        const newSettings = {
-          ...prev,
-          customCommands: [...prev.customCommands, newCmd],
-        };
-        saveSettings(newSettings);
-        return newSettings;
-      });
-    },
-    []
-  );
-
-  const removeCustomCommand = useCallback(async (id: string) => {
-    setSettings((prev) => {
-      const newSettings = {
-        ...prev,
-        customCommands: prev.customCommands.filter((c) => c.id !== id),
-      };
-      saveSettings(newSettings);
-      return newSettings;
-    });
-  }, []);
-
   const addToHistory = useCallback(
     async (entry: Omit<ConversationEntry, "id" | "timestamp">) => {
       const newEntry: ConversationEntry = {
@@ -151,229 +125,250 @@ export function FridayProvider({ children }: { children: React.ReactNode }) {
       };
       const newHistory = [...historyRef.current, newEntry];
       historyRef.current = newHistory;
-      setHistory(newHistory);
       await saveHistory(newHistory);
-      return newEntry;
     },
     []
   );
 
-  const speakResponse = useCallback(
-    async (text: string, silent = false) => {
+  const speakAndReturn = useCallback(
+    async (text: string): Promise<void> => {
       setLastResponse(text);
-      if (silent || backgroundMode) {
-        setStatus("speaking");
-        await speak(text, {
-          onDone: () => setStatus("idle"),
-          onError: () => setStatus("idle"),
-        });
-      } else {
-        setStatus("speaking");
-        await speak(text, {
-          onDone: () => setStatus("idle"),
-          onError: () => setStatus("idle"),
-        });
-      }
+      setStatus("speaking");
+      await updatePersistentNotification(settingsRef.current.aiName, text.slice(0, 40));
+      await speak(text, {
+        onDone: () => {
+          setStatus(isActive ? "idle" : "off");
+        },
+        onError: () => {
+          setStatus(isActive ? "idle" : "off");
+        },
+      });
     },
-    [backgroundMode]
+    [isActive]
   );
 
-  const processTextCommand = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
-
+  const processCommand = useCallback(
+    async (transcript: string) => {
+      if (isBusyRef.current) return;
+      isBusyRef.current = true;
       setStatus("processing");
-      setError(null);
-      setCurrentTranscript(text);
+      setLastTranscript(transcript);
 
-      const currentSettings = await loadSettings();
+      const currentSettings = settingsRef.current;
 
-      await addToHistory({ role: "user", content: text });
-
-      const taskId = generateId();
+      await addToHistory({ role: "user", content: transcript });
 
       try {
         const customCmd = currentSettings.customCommands.find((cmd) =>
-          text.toLowerCase().includes(cmd.trigger.toLowerCase())
+          transcript.toLowerCase().includes(cmd.trigger.toLowerCase())
         );
-
         if (customCmd) {
-          const actionParts = customCmd.action.split(":");
-          setCurrentTask({
-            id: taskId,
-            description: customCmd.description,
-            type: "custom_command",
-            status: "running",
-            timestamp: Date.now(),
-          });
-
-          const result = await executeAction({
-            type: actionParts[0],
-            target: actionParts[1],
-          });
-
-          const response = result.spokenResponse || customCmd.description;
-          setCurrentTask((t) => t?.id === taskId ? { ...t, status: "done" } : t);
-          await addToHistory({
-            role: "assistant",
-            content: response,
-            commandType: "custom",
-          });
-          await speakResponse(response);
-          setTimeout(() => setCurrentTask(null), 2000);
-          setCurrentTranscript("");
+          const [actionType, actionTarget] = customCmd.action.split(":");
+          const result = await executeAction({ type: actionType, target: actionTarget });
+          const reply = result.spokenResponse || customCmd.description;
+          await addToHistory({ role: "assistant", content: reply, commandType: "custom" });
+          await speakAndReturn(reply);
+          isBusyRef.current = false;
+          switchToWakeWordMode();
+          setListeningMode("wake_word");
           return;
         }
 
-        const deviceAction = await parseCommand(text);
+        const deviceAction = await parseCommand(transcript);
         if (deviceAction) {
-          setCurrentTask({
-            id: taskId,
-            description: `Executing: ${deviceAction.type.replace(/_/g, " ")}`,
-            type: deviceAction.type,
-            status: "running",
-            timestamp: Date.now(),
-          });
-
           const result = await executeAction(deviceAction);
-          const response = result.spokenResponse || result.message;
-          setCurrentTask((t) => t?.id === taskId ? { ...t, status: "done" } : t);
-          await addToHistory({
-            role: "assistant",
-            content: response,
-            commandType: deviceAction.type,
-          });
-          await speakResponse(response);
-          setTimeout(() => setCurrentTask(null), 2000);
-          setCurrentTranscript("");
+          const reply = result.spokenResponse || result.message;
+          await addToHistory({ role: "assistant", content: reply, commandType: deviceAction.type });
+          await speakAndReturn(reply);
+          isBusyRef.current = false;
+          switchToWakeWordMode();
+          setListeningMode("wake_word");
           return;
         }
 
-        const offlineResult = processOffline(text, currentSettings);
-
+        const offlineResult = processOffline(transcript, currentSettings);
         if (offlineResult && offlineResult.confidence === "high") {
-          await addToHistory({
-            role: "assistant",
-            content: offlineResult.text,
-            commandType: offlineResult.commandType,
-          });
-          await speakResponse(offlineResult.text);
-          setCurrentTranscript("");
+          await addToHistory({ role: "assistant", content: offlineResult.text, commandType: offlineResult.commandType });
+          await speakAndReturn(offlineResult.text);
+          isBusyRef.current = false;
+          switchToWakeWordMode();
+          setListeningMode("wake_word");
           return;
         }
 
         if (isOnline) {
-          setCurrentTask({
-            id: taskId,
-            description: "Thinking...",
-            type: "ai_chat",
-            status: "running",
-            timestamp: Date.now(),
-          });
-
-          const recentHistory = historyRef.current.slice(-8).map((h) => ({
+          const history = historyRef.current.slice(-8).map((h) => ({
             role: h.role,
             content: h.content,
           }));
-          recentHistory.push({ role: "user", content: text });
-
-          const aiResponse = await chatCompletion(
-            recentHistory,
-            currentSettings.systemPrompt
-          );
-
-          setCurrentTask((t) => t?.id === taskId ? { ...t, status: "done" } : t);
-          await addToHistory({
-            role: "assistant",
-            content: aiResponse,
-            commandType: "conversation",
-          });
-          await speakResponse(aiResponse);
-          setTimeout(() => setCurrentTask(null), 2000);
+          history.push({ role: "user", content: transcript });
+          const aiReply = await chatCompletion(history, currentSettings.systemPrompt);
+          await addToHistory({ role: "assistant", content: aiReply, commandType: "conversation" });
+          await speakAndReturn(aiReply);
         } else {
-          const fallback = offlineResult?.text ||
-            `I'm in offline mode. I can open apps, call contacts, and handle basic commands. Connect to internet for my full capabilities.`;
-          await addToHistory({
-            role: "assistant",
-            content: fallback,
-            commandType: "offline",
-          });
-          await speakResponse(fallback);
+          const reply = offlineResult?.text ||
+            `I'm offline right now. I can open apps, call contacts, and handle basic commands without internet.`;
+          await addToHistory({ role: "assistant", content: reply, commandType: "offline" });
+          await speakAndReturn(reply);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "An error occurred";
+        const msg = err instanceof Error ? err.message : "Error";
         setError(msg);
-        setCurrentTask((t) => t?.id === taskId ? { ...t, status: "failed" } : t);
-        const fallback = "I ran into an error. Please try again.";
-        await addToHistory({
-          role: "assistant",
-          content: fallback,
-          commandType: "error",
-        });
-        await speakResponse(fallback);
-        setTimeout(() => {
-          setError(null);
-          setCurrentTask(null);
-        }, 3000);
+        await speakAndReturn("I ran into an issue. Please try again.");
+        setTimeout(() => setError(null), 3000);
       }
-      setCurrentTranscript("");
+
+      isBusyRef.current = false;
+      switchToWakeWordMode();
+      setListeningMode("wake_word");
     },
-    [isOnline, addToHistory, speakResponse]
+    [isOnline, addToHistory, speakAndReturn]
   );
 
-  const clearConversationHistory = useCallback(async () => {
-    setHistory([]);
-    historyRef.current = [];
-    await clearHistory();
-  }, []);
+  const startFriday = useCallback(async () => {
+    if (isActive) return;
 
-  const setActive = useCallback((active: boolean) => {
-    setIsActiveState(active);
-    if (!active) {
-      setStatus("idle");
-      setCurrentTranscript("");
-      stopSpeaking();
-    } else {
-      setStatus("idle");
+    const notifGranted = await requestNotificationPermission();
+    activateKeepAwake();
+    await registerBackgroundTask();
+
+    const currentSettings = settingsRef.current;
+    if (notifGranted) {
+      await showPersistentNotification(
+        currentSettings.aiName,
+        currentSettings.wakeWord
+      );
     }
-  }, []);
 
-  const stopAll = useCallback(() => {
-    stopSpeaking();
+    setIsActive(true);
     setStatus("idle");
-    setCurrentTask(null);
-    setCurrentTranscript("");
-    setError(null);
+    setListeningMode("wake_word");
+
+    await startEngine({
+      wakeWord: currentSettings.wakeWord,
+      deactivateWord: currentSettings.deactivateWord,
+    });
+
+    const removeListener = addVoiceListener(async (event) => {
+      if (event.type === "mode_change") {
+        setListeningMode(event.mode as ListeningMode);
+        if (event.mode === "wake_word") {
+          setStatus("idle");
+          isBusyRef.current = false;
+        } else if (event.mode === "command") {
+          setStatus("listening");
+        }
+      } else if (event.type === "wake_word_detected") {
+        setStatus("listening");
+        const s = settingsRef.current;
+        await speak(`Yes, ${s.ownerName}?`);
+      } else if (event.type === "command_detected") {
+        if (!isBusyRef.current) {
+          processCommand(event.transcript);
+        }
+      } else if (event.type === "deactivate_detected") {
+        const s = settingsRef.current;
+        await speak(`Goodbye ${s.ownerName}. ${s.aiName} going to standby.`);
+        setStatus("idle");
+        setListeningMode("wake_word");
+        isBusyRef.current = false;
+      } else if (event.type === "transcript") {
+        if (!isBusyRef.current) {
+          setLastTranscript(event.text);
+        }
+      } else if (event.type === "error") {
+        setError(event.message);
+        setTimeout(() => setError(null), 3000);
+      }
+    });
+
+    (startFriday as any).__removeListener = removeListener;
+  }, [isActive, processCommand]);
+
+  const stopFriday = useCallback(async () => {
+    if (!isActive) return;
+
+    const removeListener = (startFriday as any).__removeListener;
+    if (removeListener) removeListener();
+
+    await stopEngine();
+    await stopSpeaking();
+    await dismissPersistentNotification();
+    deactivateKeepAwake();
+
+    setIsActive(false);
+    setStatus("off");
+    setListeningMode("off");
+    isBusyRef.current = false;
+    setLastTranscript("");
+  }, [isActive]);
+
+  const updateSettings = useCallback(
+    async (updates: Partial<FridaySettings>) => {
+      const newSettings = { ...settingsRef.current, ...updates };
+      settingsRef.current = newSettings;
+      setSettings(newSettings);
+      await saveSettings(newSettings);
+      if (isActive && (updates.wakeWord || updates.deactivateWord)) {
+        updateWakeWords(
+          newSettings.wakeWord,
+          newSettings.deactivateWord
+        );
+      }
+    },
+    [isActive]
+  );
+
+  const addCustomCommand = useCallback(
+    async (cmd: Omit<CustomCommand, "id">) => {
+      const newCmd: CustomCommand = { ...cmd, id: generateId() };
+      const newSettings = {
+        ...settingsRef.current,
+        customCommands: [...settingsRef.current.customCommands, newCmd],
+      };
+      settingsRef.current = newSettings;
+      setSettings(newSettings);
+      await saveSettings(newSettings);
+    },
+    []
+  );
+
+  const removeCustomCommand = useCallback(async (id: string) => {
+    const newSettings = {
+      ...settingsRef.current,
+      customCommands: settingsRef.current.customCommands.filter((c) => c.id !== id),
+    };
+    settingsRef.current = newSettings;
+    setSettings(newSettings);
+    await saveSettings(newSettings);
   }, []);
 
-  const setBackgroundMode = useCallback((v: boolean) => {
-    setBackgroundModeState(v);
-  }, []);
+  const markSetupComplete = useCallback(async () => {
+    await updateSettings({ setupComplete: true } as any);
+    setIsSetupComplete(true);
+  }, [updateSettings]);
+
+  const clearError = useCallback(() => setError(null), []);
 
   return (
     <FridayContext.Provider
       value={{
         settings,
-        history,
         status,
+        listeningMode,
         isActive,
         isOnline,
-        currentTranscript,
+        lastTranscript,
         lastResponse,
         error,
-        currentTask,
-        backgroundMode,
+        isSetupComplete,
         updateSettings,
         addCustomCommand,
         removeCustomCommand,
-        processTextCommand,
-        clearConversationHistory,
-        setActive,
-        setCurrentTranscript,
-        setStatus,
-        setError,
-        setBackgroundMode,
-        stopAll,
+        startFriday,
+        stopFriday,
+        clearError,
+        markSetupComplete,
       }}
     >
       {children}

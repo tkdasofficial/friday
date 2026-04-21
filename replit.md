@@ -1,73 +1,76 @@
-# FRIDAY - AI VoiceBot
+# FRIDAY — AI VoiceBot
 
-## Overview
-
-FRIDAY is an AI-powered voice assistant mobile app built with React Native (Expo). It can follow voice/text commands, control device functions, and respond intelligently using OpenAI's GPT models with text-to-speech capabilities.
+## Project Overview
+FRIDAY is a voice-command AI assistant mobile app (Expo/React Native) with these design principles:
+- **Voice-only activation/deactivation** — no buttons, pure wake word flow
+- **Offline-first** — TTS and basic AI work without internet (expo-speech + pattern matching)
+- **Background service** — runs continuously with persistent notification
+- **Setup-only UI** — the app interface is purely for configuration; the bot runs in background
 
 ## Architecture
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **Mobile**: Expo / React Native (artifacts/friday/)
-- **API framework**: Express 5 (artifacts/api-server/)
-- **AI**: OpenAI via Replit AI Integrations (gpt-5.2 + TTS + STT)
-- **Local Storage**: AsyncStorage with XML serialization (no external DB)
-- **Build**: esbuild (API server)
+### Key Files
+- `artifacts/friday/app/index.tsx` — Minimal status screen (orb + status + gear icon only)
+- `artifacts/friday/app/settings.tsx` — Tabbed setup screen (Identity, Activation, Voice, Commands, AI, Permissions)
+- `artifacts/friday/context/FridayContext.tsx` — Global state + voice engine integration + background service
+- `artifacts/friday/utils/voiceEngine.ts` — Continuous speech recognition loop (expo-speech-recognition + Web Speech API fallback)
+- `artifacts/friday/utils/backgroundService.ts` — Background task, keep-awake, persistent notification
+- `artifacts/friday/utils/speechEngine.ts` — Offline TTS (expo-speech)
+- `artifacts/friday/utils/offlineAI.ts` — Offline pattern-matching AI
+- `artifacts/friday/utils/deviceActions.ts` — Device automation via Linking (20+ apps)
+- `artifacts/friday/utils/xmlStorage.ts` — XML-based local persistence (AsyncStorage backend)
+- `artifacts/friday/utils/openaiClient.ts` — Online GPT fallback
+- `artifacts/api-server/src/routes/friday.ts` — Chat API endpoint (online mode only)
 
-## Key Features
+### Voice Flow
+1. App starts → `startEngine()` initializes continuous speech recognition in **wake_word** mode
+2. User says wake word (default: "hey friday") → switches to **command** mode, speaks "Yes, [name]?"
+3. User says command → `processCommand()` → device action / offline AI / online GPT
+4. After response → returns to **wake_word** mode automatically
+5. User says deactivate phrase → speaks farewell → stays in wake_word mode (standby)
 
-- Voice orb interface with animated states (idle/listening/processing/speaking)
-- AI conversation powered by GPT-5.2 (via Replit AI Integrations)
-- Text-to-speech responses using OpenAI TTS (6 voice options)
-- Device automation: open apps, search, call, message, navigate, play music, alarms, timers, WiFi/Bluetooth settings
-- Custom AI name, wake word, deactivate word
-- Owner name personalization
-- Custom trigger commands mapped to device actions
-- XML-based local storage (no external backend/database)
-- Conversation history with grouping by date
-- Security mode toggle
-- Full permissions manifest (microphone, camera, contacts, location)
+### Background Service
+- `expo-task-manager` + `expo-background-fetch` — keeps app alive periodically
+- `expo-keep-awake` — prevents CPU/screen sleep
+- `expo-notifications` — persistent foreground-style notification showing status
+- True continuous background listening requires an EAS dev build (not Expo Go limitation)
 
-## App Structure (artifacts/friday/)
+### Offline Capabilities
+- TTS: expo-speech (device native, no internet)
+- AI: Pattern matching for greetings, time, date, jokes, capabilities, device actions
+- Device control: 20+ apps via deep links, calls, navigation, music, alarms
+- Online fallback: GPT via API server when connected
 
-- `app/index.tsx` — Main voice interface with VoiceOrb
-- `app/settings.tsx` — AI settings, custom commands, voice selection
-- `app/history.tsx` — Conversation history
-- `components/VoiceOrb.tsx` — Animated voice orb with wave effects
-- `components/StatusBadge.tsx` — Status indicator
-- `components/ConversationBubble.tsx` — Chat bubbles
-- `context/FridayContext.tsx` — Global state management
-- `utils/xmlStorage.ts` — XML-based persistence layer
-- `utils/deviceActions.ts` — Device automation (Linking-based)
-- `utils/openaiClient.ts` — Client for AI API calls
+### Theme
+- Background: #03060F (deep space dark)
+- Primary/Tech Blue: #3B9EFF
+- Cyber Green: #00E5A0 (listening state)
+- Neon Purple: #7C3AED (processing state)
+- Font: Inter (400, 500, 600, 700)
 
-## API Server (artifacts/api-server/)
+## Permissions Required
+- Microphone (continuous listening)
+- Speech Recognition
+- Contacts (calling by name)
+- Location (navigation)
+- Notifications (background status)
+- Wake Lock / Foreground Service (Android)
+- Background Audio (iOS)
 
-- `POST /api/friday/chat` — GPT-5.2 chat completions
-- `POST /api/friday/transcribe` — Audio transcription (STT)
-- `POST /api/friday/speak` — Text-to-speech (TTS)
-- `GET /api/healthz` — Health check
+## Setup Flow for New Users
+1. Open app → see "Setup" prompt
+2. Tap gear → configure Identity, Activation words, Voice, Commands, AI
+3. Grant Permissions
+4. Tap "Setup Complete" → returns to home
+5. Tap "Start FRIDAY" → background service begins
+6. From then on: voice only
 
-## Key Commands
-
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
-- `pnpm --filter @workspace/friday run dev` — run Expo app locally
-
-## Environment Variables
-
-- `AI_INTEGRATIONS_OPENAI_BASE_URL` — Auto-set by Replit AI Integrations
-- `AI_INTEGRATIONS_OPENAI_API_KEY` — Auto-set by Replit AI Integrations
-- `EXPO_PUBLIC_DOMAIN` — Injected at runtime by Expo workflow
-
-## Notes
-
-- Uses npm-only compatible packages (no pnpm-specific overrides in Expo)
-- XML storage format for all persistent data (settings + history)
-- Device automation uses React Native Linking API for cross-platform support
-- On Android, deeper device control requires accessibility services (out of Expo Go scope)
-- Full native Java/Kotlin modules would require an EAS build (not Expo Go)
+## Stack
+- Expo SDK 54 / React Native 0.81
+- expo-speech-recognition (STT)
+- expo-speech (TTS, offline)
+- expo-task-manager + expo-background-fetch (background)
+- expo-notifications (persistent notification)
+- expo-keep-awake (prevent sleep)
+- @react-native-community/netinfo (network detection)
+- expo-av, expo-haptics, expo-router

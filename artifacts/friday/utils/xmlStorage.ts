@@ -10,6 +10,7 @@ export interface FridaySettings {
   securityEnabled: boolean;
   ownerName: string;
   systemPrompt: string;
+  setupComplete: boolean;
 }
 
 export interface CustomCommand {
@@ -46,6 +47,7 @@ function settingsToXml(settings: FridaySettings): string {
   <voice_id>${escapeXml(settings.voiceId)}</voice_id>
   <owner_name>${escapeXml(settings.ownerName)}</owner_name>
   <security_enabled>${settings.securityEnabled ? "true" : "false"}</security_enabled>
+  <setup_complete>${settings.setupComplete ? "true" : "false"}</setup_complete>
   <system_prompt>${escapeXml(settings.systemPrompt)}</system_prompt>
   <custom_commands>
 ${commandsXml}
@@ -80,6 +82,7 @@ function xmlToSettings(xml: string): Partial<FridaySettings> {
     voiceId: getTag("voice_id"),
     ownerName: getTag("owner_name"),
     securityEnabled: getTag("security_enabled") === "true",
+    setupComplete: getTag("setup_complete") === "true",
     systemPrompt: getTag("system_prompt"),
     customCommands,
   };
@@ -143,9 +146,10 @@ export const DEFAULT_SETTINGS: FridaySettings = {
   aiName: "FRIDAY",
   wakeWord: "hey friday",
   deactivateWord: "goodbye friday",
-  voiceId: "alloy",
+  voiceId: "en-US",
   ownerName: "Boss",
   securityEnabled: false,
+  setupComplete: false,
   systemPrompt:
     "You are FRIDAY, an advanced AI assistant. You help the user control their device, answer questions, and perform tasks. Be concise, helpful, and proactive. When asked to open apps, provide helpful context. When searching, give useful information. Keep responses short for voice output.",
   customCommands: [
