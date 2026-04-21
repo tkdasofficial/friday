@@ -21,7 +21,7 @@ import {
   saveSettings,
 } from "@/utils/xmlStorage";
 import { executeAction, parseCommand } from "@/utils/deviceActions";
-import { speak, stopSpeaking } from "@/utils/speechEngine";
+import { speak, stopSpeaking, setVoicePrefs } from "@/utils/speechEngine";
 import { processOffline } from "@/utils/offlineAI";
 import { chatCompletion } from "@/utils/openaiClient";
 import {
@@ -92,6 +92,13 @@ export function FridayProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     settingsRef.current = settings;
+    setVoicePrefs({
+      language: settings.voiceId || "en-US",
+      voiceId: settings.voiceName || undefined,
+      persona: settings.voicePersona,
+      pitch: settings.voicePitch,
+      rate: settings.voiceRate,
+    });
   }, [settings]);
 
   useEffect(() => {

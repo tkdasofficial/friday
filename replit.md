@@ -15,7 +15,7 @@ FRIDAY is a voice-command AI assistant mobile app (Expo/React Native) with these
 - `artifacts/friday/context/FridayContext.tsx` — Global state + voice engine integration + background service
 - `artifacts/friday/utils/voiceEngine.ts` — Continuous speech recognition loop (expo-speech-recognition + Web Speech API fallback)
 - `artifacts/friday/utils/backgroundService.ts` — Background task, keep-awake, persistent notification
-- `artifacts/friday/utils/speechEngine.ts` — Offline TTS (expo-speech)
+- `artifacts/friday/utils/speechEngine.ts` — Offline TTS (expo-speech) with realistic female-voice auto-pick, persona presets (sweet/warm/bright/calm/natural), pitch/rate control, Web Speech API support, and natural-cadence text shaping
 - `artifacts/friday/utils/offlineAI.ts` — Offline pattern-matching AI
 - `artifacts/friday/utils/deviceActions.ts` — Device automation via Linking (20+ apps)
 - `artifacts/friday/utils/xmlStorage.ts` — XML-based local persistence (AsyncStorage backend)

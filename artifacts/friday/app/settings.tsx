@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
@@ -18,6 +18,14 @@ import { useFriday } from "@/context/FridayContext";
 import { useColors } from "@/hooks/useColors";
 import type { CustomCommand } from "@/utils/xmlStorage";
 import { requestPermissions } from "@/utils/voiceEngine";
+import {
+  listFemaleVoices,
+  speak,
+  stopSpeaking,
+  VOICE_PERSONAS,
+  type SimpleVoice,
+} from "@/utils/speechEngine";
+import type { VoicePersonaId } from "@/utils/xmlStorage";
 
 const SECTIONS = [
   { id: "identity", label: "Identity", icon: "user" as const },
@@ -59,6 +67,33 @@ export default function SetupScreen() {
   const [cmdAction, setCmdAction] = useState("");
   const [cmdDesc, setCmdDesc] = useState("");
   const [permStatus, setPermStatus] = useState<"idle" | "ok" | "denied">("idle");
+  const [femaleVoices, setFemaleVoices] = useState<SimpleVoice[]>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setVoicesLoading(true);
+    listFemaleVoices(settings.voiceId || "en-US")
+      .then((v) => {
+        if (!cancelled) setFemaleVoices(v);
+      })
+      .catch(() => {})
+      .finally(() => !cancelled && setVoicesLoading(false));
+    return () => { cancelled = true; };
+  }, [settings.voiceId]);
+
+  const handleTestVoice = async () => {
+    if (testing) { stopSpeaking(); setTesting(false); return; }
+    setTesting(true);
+    Haptics.selectionAsync();
+    try {
+      await speak(
+        `Hello ${settings.ownerName}. I'm ${settings.aiName}. This is how I'll sound when I talk to you.`
+      );
+    } catch {}
+    setTesting(false);
+  };
 
   const topPad = Platform.OS === "web" ? 12 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -219,7 +254,11 @@ export default function SetupScreen() {
         return (
           <View style={styles.sectionContent}>
             <Text style={[styles.sectionDesc, { color: colors.mutedForeground }]}>
-              Choose the language for voice recognition and speech output. Works fully offline.
+              Choose a realistic female voice and tone. The best high-quality voice for your language is picked automatically.
+            </Text>
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 4 }]}>
+              Language
             </Text>
             <View style={styles.langGrid}>
               {VOICE_LANGS.map((lang) => {
@@ -227,7 +266,7 @@ export default function SetupScreen() {
                 return (
                   <TouchableOpacity
                     key={lang.id}
-                    onPress={() => updateSettings({ voiceId: lang.id })}
+                    onPress={() => updateSettings({ voiceId: lang.id, voiceName: "" })}
                     style={[
                       styles.langChip,
                       {
@@ -236,21 +275,173 @@ export default function SetupScreen() {
                       },
                     ]}
                   >
-                    {active && (
-                      <Feather name="check" size={12} color={colors.techBlue} />
-                    )}
-                    <Text
-                      style={[
-                        styles.langText,
-                        { color: active ? colors.techBlue : colors.foreground },
-                      ]}
-                    >
+                    {active && <Feather name="check" size={12} color={colors.techBlue} />}
+                    <Text style={[styles.langText, { color: active ? colors.techBlue : colors.foreground }]}>
                       {lang.label}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 16 }]}>
+              Tone / Persona
+            </Text>
+            <View style={styles.langGrid}>
+              {VOICE_PERSONAS.map((p) => {
+                const active = settings.voicePersona === p.id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => updateSettings({ voicePersona: p.id as VoicePersonaId })}
+                    style={[
+                      styles.langChip,
+                      {
+                        backgroundColor: active ? colors.cyberGreen + "20" : colors.card,
+                        borderColor: active ? colors.cyberGreen : colors.border,
+                      },
+                    ]}
+                  >
+                    {active && <Feather name="check" size={12} color={colors.cyberGreen} />}
+                    <Text style={[styles.langText, { color: active ? colors.cyberGreen : colors.foreground }]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[styles.fieldHint, { color: colors.mutedForeground + "90", marginTop: 6 }]}>
+              {VOICE_PERSONAS.find((p) => p.id === settings.voicePersona)?.desc}
+            </Text>
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 16 }]}>
+              Pitch  ({settings.voicePitch.toFixed(2)})
+            </Text>
+            <View style={styles.langGrid}>
+              {[0.95, 1.05, 1.15, 1.25, 1.35].map((p) => {
+                const active = Math.abs(settings.voicePitch - p) < 0.01;
+                return (
+                  <TouchableOpacity
+                    key={p}
+                    onPress={() => updateSettings({ voicePitch: p })}
+                    style={[
+                      styles.langChip,
+                      {
+                        backgroundColor: active ? colors.techBlue + "20" : colors.card,
+                        borderColor: active ? colors.techBlue : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.langText, { color: active ? colors.techBlue : colors.foreground }]}>
+                      {p.toFixed(2)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 12 }]}>
+              Speed  ({settings.voiceRate.toFixed(2)})
+            </Text>
+            <View style={styles.langGrid}>
+              {[0.85, 0.92, 0.95, 1.0, 1.1].map((r) => {
+                const active = Math.abs(settings.voiceRate - r) < 0.01;
+                return (
+                  <TouchableOpacity
+                    key={r}
+                    onPress={() => updateSettings({ voiceRate: r })}
+                    style={[
+                      styles.langChip,
+                      {
+                        backgroundColor: active ? colors.techBlue + "20" : colors.card,
+                        borderColor: active ? colors.techBlue : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.langText, { color: active ? colors.techBlue : colors.foreground }]}>
+                      {r.toFixed(2)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 16 }]}>
+              Voice  {voicesLoading ? "(loading…)" : `(${femaleVoices.length} female)`}
+            </Text>
+            <TouchableOpacity
+              onPress={() => updateSettings({ voiceName: "" })}
+              style={[
+                styles.fieldRow,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: !settings.voiceName ? colors.cyberGreen : colors.border,
+                },
+              ]}
+            >
+              <View style={styles.fieldLeft}>
+                <Text style={[styles.fieldValue, { color: colors.foreground }]}>
+                  Auto — best female voice
+                </Text>
+                <Text style={[styles.fieldHint, { color: colors.mutedForeground + "90" }]}>
+                  Picks the highest-quality realistic female voice on this device
+                </Text>
+              </View>
+              {!settings.voiceName && <Feather name="check" size={14} color={colors.cyberGreen} />}
+            </TouchableOpacity>
+
+            {femaleVoices.slice(0, 12).map((v) => {
+              const active = settings.voiceName === v.id;
+              return (
+                <TouchableOpacity
+                  key={v.id}
+                  onPress={() => updateSettings({ voiceName: v.id })}
+                  style={[
+                    styles.fieldRow,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: active ? colors.techBlue : colors.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.fieldLeft}>
+                    <Text style={[styles.fieldValue, { color: colors.foreground }]}>
+                      {v.name}{v.quality === "high" ? "  ✨" : ""}
+                    </Text>
+                    <Text style={[styles.fieldHint, { color: colors.mutedForeground + "90" }]}>
+                      {v.language}{v.quality === "high" ? " · Enhanced" : ""}
+                    </Text>
+                  </View>
+                  {active && <Feather name="check" size={14} color={colors.techBlue} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity
+              onPress={handleTestVoice}
+              style={[
+                styles.fullBtn,
+                {
+                  backgroundColor: testing ? colors.destructive + "20" : colors.cyberGreen + "18",
+                  borderColor: testing ? colors.destructive + "60" : colors.cyberGreen + "50",
+                  marginTop: 12,
+                },
+              ]}
+            >
+              <Feather
+                name={testing ? "square" : "play"}
+                size={16}
+                color={testing ? colors.destructive : colors.cyberGreen}
+              />
+              <Text
+                style={[
+                  styles.fullBtnText,
+                  { color: testing ? colors.destructive : colors.cyberGreen },
+                ]}
+              >
+                {testing ? "Stop" : "Test Voice"}
+              </Text>
+            </TouchableOpacity>
           </View>
         );
 

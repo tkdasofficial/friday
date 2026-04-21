@@ -1,10 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+export type VoicePersonaId = "sweet" | "warm" | "bright" | "calm" | "natural";
+
 export interface FridaySettings {
   aiName: string;
   wakeWord: string;
   deactivateWord: string;
   voiceId: string;
+  voiceName: string;
+  voicePersona: VoicePersonaId;
+  voicePitch: number;
+  voiceRate: number;
   customCommands: CustomCommand[];
   conversationHistory: ConversationEntry[];
   securityEnabled: boolean;
@@ -45,6 +51,10 @@ function settingsToXml(settings: FridaySettings): string {
   <wake_word>${escapeXml(settings.wakeWord)}</wake_word>
   <deactivate_word>${escapeXml(settings.deactivateWord)}</deactivate_word>
   <voice_id>${escapeXml(settings.voiceId)}</voice_id>
+  <voice_name>${escapeXml(settings.voiceName || "")}</voice_name>
+  <voice_persona>${escapeXml(settings.voicePersona)}</voice_persona>
+  <voice_pitch>${settings.voicePitch}</voice_pitch>
+  <voice_rate>${settings.voiceRate}</voice_rate>
   <owner_name>${escapeXml(settings.ownerName)}</owner_name>
   <security_enabled>${settings.securityEnabled ? "true" : "false"}</security_enabled>
   <setup_complete>${settings.setupComplete ? "true" : "false"}</setup_complete>
@@ -75,11 +85,19 @@ function xmlToSettings(xml: string): Partial<FridaySettings> {
     });
   }
 
+  const persona = (getTag("voice_persona") || "sweet") as VoicePersonaId;
+  const pitchStr = getTag("voice_pitch");
+  const rateStr = getTag("voice_rate");
+
   return {
     aiName: getTag("ai_name"),
     wakeWord: getTag("wake_word"),
     deactivateWord: getTag("deactivate_word"),
     voiceId: getTag("voice_id"),
+    voiceName: getTag("voice_name"),
+    voicePersona: persona,
+    voicePitch: pitchStr ? parseFloat(pitchStr) : 1.18,
+    voiceRate: rateStr ? parseFloat(rateStr) : 0.94,
     ownerName: getTag("owner_name"),
     securityEnabled: getTag("security_enabled") === "true",
     setupComplete: getTag("setup_complete") === "true",
@@ -147,7 +165,12 @@ export const DEFAULT_SETTINGS: FridaySettings = {
   wakeWord: "hey friday",
   deactivateWord: "goodbye friday",
   voiceId: "en-US",
+  voiceName: "",
+  voicePersona: "sweet",
+  voicePitch: 1.18,
+  voiceRate: 0.94,
   ownerName: "Boss",
+  conversationHistory: [],
   securityEnabled: false,
   setupComplete: false,
   systemPrompt:
