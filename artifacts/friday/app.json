@@ -33,7 +33,7 @@
       }
     },
     "android": {
-      "package": "com.fridayassistant.friday",
+      "package": "com.friday.assistant",
       "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO",
