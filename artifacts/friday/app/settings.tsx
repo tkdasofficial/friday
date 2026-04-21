@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Alert,
-  FlatList,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,29 +20,32 @@ import { useFriday } from "@/context/FridayContext";
 import type { CustomCommand } from "@/utils/xmlStorage";
 
 const VOICES = [
-  { id: "alloy", label: "Alloy" },
-  { id: "echo", label: "Echo" },
-  { id: "fable", label: "Fable" },
-  { id: "onyx", label: "Onyx" },
-  { id: "nova", label: "Nova" },
-  { id: "shimmer", label: "Shimmer" },
+  { id: "en-US", label: "US English", lang: "en-US" },
+  { id: "en-GB", label: "UK English", lang: "en-GB" },
+  { id: "en-AU", label: "AU English", lang: "en-AU" },
+  { id: "hi-IN", label: "Hindi", lang: "hi-IN" },
 ];
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { settings, updateSettings, addCustomCommand, removeCustomCommand, clearConversationHistory } =
-    useFriday();
+  const {
+    settings,
+    updateSettings,
+    addCustomCommand,
+    removeCustomCommand,
+    clearConversationHistory,
+  } = useFriday();
 
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState("");
   const [showAddCommand, setShowAddCommand] = useState(false);
-  const [newCmdTrigger, setNewCmdTrigger] = useState("");
-  const [newCmdAction, setNewCmdAction] = useState("");
-  const [newCmdDesc, setNewCmdDesc] = useState("");
+  const [newTrigger, setNewTrigger] = useState("");
+  const [newAction, setNewAction] = useState("");
+  const [newDesc, setNewDesc] = useState("");
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const handleSave = async (field: string) => {
     if (!tempValue.trim()) return;
@@ -53,54 +55,57 @@ export default function SettingsScreen() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleAddCommand = async () => {
-    if (!newCmdTrigger.trim() || !newCmdAction.trim()) {
-      Alert.alert("Error", "Trigger and action are required.");
+  const handleAddCmd = async () => {
+    if (!newTrigger.trim() || !newAction.trim()) {
+      Alert.alert("Missing fields", "Trigger and action are required.");
       return;
     }
     await addCustomCommand({
-      trigger: newCmdTrigger.trim(),
-      action: newCmdAction.trim(),
-      description: newCmdDesc.trim() || newCmdTrigger.trim(),
+      trigger: newTrigger.trim(),
+      action: newAction.trim(),
+      description: newDesc.trim() || newTrigger.trim(),
     });
-    setNewCmdTrigger("");
-    setNewCmdAction("");
-    setNewCmdDesc("");
+    setNewTrigger("");
+    setNewAction("");
+    setNewDesc("");
     setShowAddCommand(false);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleRemoveCommand = (cmd: CustomCommand) => {
-    Alert.alert(
-      "Remove Command",
-      `Remove "${cmd.trigger}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => removeCustomCommand(cmd.id),
-        },
-      ]
-    );
+  const confirmRemove = (cmd: CustomCommand) => {
+    Alert.alert("Remove Command", `Remove "${cmd.trigger}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => removeCustomCommand(cmd.id),
+      },
+    ]);
   };
 
-  const handleClearHistory = () => {
+  const confirmClearHistory = () => {
     Alert.alert(
       "Clear History",
-      "This will permanently delete all conversation history.",
+      "Delete all conversation history permanently?",
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: clearConversationHistory,
-        },
+        { text: "Clear", style: "destructive", onPress: clearConversationHistory },
       ]
     );
   };
 
-  const Field = ({
+  const SectionHeader = ({ title }: { title: string }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={[styles.sectionTitle, { color: colors.techBlue }]}>
+        {title}
+      </Text>
+      <View
+        style={[styles.sectionLine, { backgroundColor: colors.techBlue + "25" }]}
+      />
+    </View>
+  );
+
+  const EditableRow = ({
     label,
     field,
     value,
@@ -113,12 +118,16 @@ export default function SettingsScreen() {
   }) => (
     <View
       style={[
-        styles.fieldRow,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        styles.editRow,
+        {
+          backgroundColor: colors.card,
+          borderColor:
+            editingField === field ? colors.techBlue + "60" : colors.border,
+        },
       ]}
     >
-      <View style={styles.fieldInfo}>
-        <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>
+      <View style={styles.editRowLeft}>
+        <Text style={[styles.editLabel, { color: colors.mutedForeground }]}>
           {label}
         </Text>
         {editingField === field ? (
@@ -127,45 +136,50 @@ export default function SettingsScreen() {
             onChangeText={setTempValue}
             placeholder={placeholder}
             placeholderTextColor={colors.mutedForeground}
-            style={[styles.fieldInput, { color: colors.foreground }]}
+            style={[styles.editInput, { color: colors.foreground }]}
             autoFocus
             onSubmitEditing={() => handleSave(field)}
           />
         ) : (
-          <Text style={[styles.fieldValue, { color: colors.foreground }]}>
+          <Text style={[styles.editValue, { color: colors.foreground }]}>
             {value}
           </Text>
         )}
       </View>
-      {editingField === field ? (
-        <View style={styles.editButtons}>
+      <View style={styles.editActions}>
+        {editingField === field ? (
+          <>
+            <TouchableOpacity
+              onPress={() => {
+                setEditingField(null);
+                setTempValue("");
+              }}
+              style={[styles.miniBtn, { backgroundColor: colors.secondary }]}
+            >
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleSave(field)}
+              style={[
+                styles.miniBtn,
+                { backgroundColor: colors.techBlue + "25" },
+              ]}
+            >
+              <Feather name="check" size={14} color={colors.techBlue} />
+            </TouchableOpacity>
+          </>
+        ) : (
           <TouchableOpacity
             onPress={() => {
-              setEditingField(null);
-              setTempValue("");
+              setEditingField(field);
+              setTempValue(value);
             }}
-            style={[styles.editBtn, { backgroundColor: colors.secondary }]}
+            style={[styles.miniBtn, { backgroundColor: colors.secondary }]}
           >
-            <Feather name="x" size={16} color={colors.mutedForeground} />
+            <Feather name="edit-2" size={14} color={colors.mutedForeground} />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleSave(field)}
-            style={[styles.editBtn, { backgroundColor: colors.primary + "20" }]}
-          >
-            <Feather name="check" size={16} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          onPress={() => {
-            setEditingField(field);
-            setTempValue(value);
-          }}
-          style={[styles.editBtn, { backgroundColor: colors.secondary }]}
-        >
-          <Feather name="edit-2" size={16} color={colors.mutedForeground} />
-        </TouchableOpacity>
-      )}
+        )}
+      </View>
     </View>
   );
 
@@ -175,72 +189,98 @@ export default function SettingsScreen() {
         style={[
           styles.header,
           {
-            paddingTop: topPadding + 12,
+            paddingTop: topPad + 8,
             borderBottomColor: colors.border,
+            backgroundColor: colors.background,
           },
         ]}
       >
         <TouchableOpacity
           onPress={() => router.back()}
-          style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[
+            styles.backBtn,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
         >
-          <Feather name="arrow-left" size={18} color={colors.foreground} />
+          <Feather name="arrow-left" size={17} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-          Settings
+          Configuration
         </Text>
-        <View style={{ width: 36 }} />
+        <View style={{ width: 34 }} />
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPadding + 24 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: bottomPad + 32 },
+        ]}
       >
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          IDENTITY
-        </Text>
-        <Field label="AI Name" field="aiName" value={settings.aiName} placeholder="e.g. FRIDAY, JARVIS" />
-        <Field label="Owner Name" field="ownerName" value={settings.ownerName} placeholder="Your name" />
+        <SectionHeader title="// IDENTITY" />
+        <EditableRow
+          label="AI Name"
+          field="aiName"
+          value={settings.aiName}
+          placeholder="FRIDAY, JARVIS, NOVA..."
+        />
+        <EditableRow
+          label="Owner Name"
+          field="ownerName"
+          value={settings.ownerName}
+          placeholder="Your name"
+        />
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          WAKE WORDS
-        </Text>
-        <Field label="Wake Word" field="wakeWord" value={settings.wakeWord} placeholder="e.g. hey friday" />
-        <Field label="Deactivate Word" field="deactivateWord" value={settings.deactivateWord} placeholder="e.g. goodbye friday" />
+        <SectionHeader title="// ACTIVATION" />
+        <EditableRow
+          label="Wake Word"
+          field="wakeWord"
+          value={settings.wakeWord}
+          placeholder="hey friday"
+        />
+        <EditableRow
+          label="Deactivate Word"
+          field="deactivateWord"
+          value={settings.deactivateWord}
+          placeholder="goodbye friday"
+        />
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          VOICE
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>
-            Voice Style
+        <SectionHeader title="// VOICE (OFFLINE)" />
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+            Uses your device's built-in speech engine. Works without internet.
           </Text>
-          <View style={styles.voiceGrid}>
+          <View style={styles.chipRow}>
             {VOICES.map((v) => (
               <TouchableOpacity
                 key={v.id}
-                onPress={() => updateSettings({ voiceId: v.id })}
+                onPress={() => updateSettings({ voiceId: v.lang })}
                 style={[
-                  styles.voiceChip,
+                  styles.chip,
                   {
                     backgroundColor:
-                      settings.voiceId === v.id
-                        ? colors.primary + "20"
+                      settings.voiceId === v.lang
+                        ? colors.techBlue + "22"
                         : colors.secondary,
                     borderColor:
-                      settings.voiceId === v.id
-                        ? colors.primary
+                      settings.voiceId === v.lang
+                        ? colors.techBlue
                         : colors.border,
                   },
                 ]}
               >
                 <Text
                   style={[
-                    styles.voiceChipText,
+                    styles.chipText,
                     {
                       color:
-                        settings.voiceId === v.id
-                          ? colors.primary
+                        settings.voiceId === v.lang
+                          ? colors.techBlue
                           : colors.foreground,
                     },
                   ]}
@@ -252,41 +292,46 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          SYSTEM PROMPT
-        </Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>
-            AI Behavior
+        <SectionHeader title="// AI BEHAVIOR" />
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.cardHint, { color: colors.mutedForeground }]}>
+            System prompt — controls AI personality when online
           </Text>
           <TextInput
             value={settings.systemPrompt}
             onChangeText={(v) => updateSettings({ systemPrompt: v })}
             multiline
             style={[
-              styles.promptInput,
-              { color: colors.foreground, borderColor: colors.border },
+              styles.promptArea,
+              {
+                color: colors.foreground,
+                backgroundColor: colors.secondary,
+                borderColor: colors.border,
+              },
             ]}
             placeholderTextColor={colors.mutedForeground}
-            placeholder="Describe how the AI should behave..."
+            placeholder="You are an AI assistant..."
           />
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          SECURITY
-        </Text>
+        <SectionHeader title="// SECURITY" />
         <View
           style={[
             styles.switchRow,
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <View>
+          <View style={styles.switchInfo}>
             <Text style={[styles.switchLabel, { color: colors.foreground }]}>
               Security Mode
             </Text>
             <Text
-              style={[styles.switchDesc, { color: colors.mutedForeground }]}
+              style={[styles.switchSub, { color: colors.mutedForeground }]}
             >
               Alert on unauthorized access attempts
             </Text>
@@ -294,49 +339,58 @@ export default function SettingsScreen() {
           <Switch
             value={settings.securityEnabled}
             onValueChange={(v) => updateSettings({ securityEnabled: v })}
-            thumbColor={settings.securityEnabled ? colors.primary : colors.mutedForeground}
+            thumbColor={
+              settings.securityEnabled ? colors.techBlue : colors.mutedForeground
+            }
             trackColor={{
               false: colors.secondary,
-              true: colors.primary + "40",
+              true: colors.techBlue + "50",
             }}
           />
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          CUSTOM COMMANDS
-        </Text>
-        <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
-          Add trigger phrases that map to specific actions
-        </Text>
+        <SectionHeader title="// CUSTOM COMMANDS" />
+        <View
+          style={[
+            styles.hintCard,
+            {
+              backgroundColor: colors.techBlue + "10",
+              borderColor: colors.techBlue + "25",
+            },
+          ]}
+        >
+          <Feather name="info" size={13} color={colors.techBlue} />
+          <Text style={[styles.hintText, { color: colors.mutedForeground }]}>
+            Actions: open_app:youtube · search:google · call:mom · navigate:home
+          </Text>
+        </View>
 
         {settings.customCommands.map((cmd) => (
           <View
             key={cmd.id}
             style={[
-              styles.commandRow,
+              styles.cmdRow,
               { backgroundColor: colors.card, borderColor: colors.border },
             ]}
           >
-            <View style={styles.commandInfo}>
-              <Text style={[styles.commandTrigger, { color: colors.primary }]}>
+            <View style={styles.cmdInfo}>
+              <Text style={[styles.cmdTrigger, { color: colors.techBlue }]}>
                 "{cmd.trigger}"
               </Text>
               <Text
-                style={[styles.commandDesc, { color: colors.mutedForeground }]}
+                style={[styles.cmdDesc, { color: colors.mutedForeground }]}
               >
-                {cmd.description}
-              </Text>
-              <Text
-                style={[styles.commandAction, { color: colors.foreground + "60" }]}
-              >
-                {cmd.action}
+                → {cmd.action}
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => handleRemoveCommand(cmd)}
-              style={[styles.deleteBtn, { backgroundColor: colors.destructive + "20" }]}
+              onPress={() => confirmRemove(cmd)}
+              style={[
+                styles.miniBtn,
+                { backgroundColor: colors.destructive + "18" },
+              ]}
             >
-              <Feather name="trash-2" size={15} color={colors.destructive} />
+              <Feather name="trash-2" size={14} color={colors.destructive} />
             </TouchableOpacity>
           </View>
         ))}
@@ -344,58 +398,38 @@ export default function SettingsScreen() {
         {showAddCommand ? (
           <View
             style={[
-              styles.addCommandForm,
-              { backgroundColor: colors.card, borderColor: colors.primary + "40" },
+              styles.addForm,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.techBlue + "40",
+              },
             ]}
           >
-            <Text
-              style={[styles.addFormTitle, { color: colors.foreground }]}
-            >
+            <Text style={[styles.addFormTitle, { color: colors.foreground }]}>
               New Command
             </Text>
-            <TextInput
-              value={newCmdTrigger}
-              onChangeText={setNewCmdTrigger}
-              placeholder="Trigger phrase (e.g. open spotify)"
-              placeholderTextColor={colors.mutedForeground}
-              style={[
-                styles.addInput,
-                {
-                  color: colors.foreground,
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-            <TextInput
-              value={newCmdAction}
-              onChangeText={setNewCmdAction}
-              placeholder="Action (e.g. open_app:spotify)"
-              placeholderTextColor={colors.mutedForeground}
-              style={[
-                styles.addInput,
-                {
-                  color: colors.foreground,
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-            <TextInput
-              value={newCmdDesc}
-              onChangeText={setNewCmdDesc}
-              placeholder="Description (optional)"
-              placeholderTextColor={colors.mutedForeground}
-              style={[
-                styles.addInput,
-                {
-                  color: colors.foreground,
-                  backgroundColor: colors.secondary,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-            <View style={styles.addFormButtons}>
+            {[
+              { value: newTrigger, setter: setNewTrigger, placeholder: 'Trigger: "open netflix"' },
+              { value: newAction, setter: setNewAction, placeholder: "Action: open_app:netflix" },
+              { value: newDesc, setter: setNewDesc, placeholder: "Description (optional)" },
+            ].map(({ value, setter, placeholder }, i) => (
+              <TextInput
+                key={i}
+                value={value}
+                onChangeText={setter}
+                placeholder={placeholder}
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.addInput,
+                  {
+                    color: colors.foreground,
+                    backgroundColor: colors.secondary,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+            ))}
+            <View style={styles.addFormBtns}>
               <TouchableOpacity
                 onPress={() => setShowAddCommand(false)}
                 style={[
@@ -403,19 +437,24 @@ export default function SettingsScreen() {
                   { backgroundColor: colors.secondary, borderColor: colors.border },
                 ]}
               >
-                <Text style={[styles.formBtnText, { color: colors.mutedForeground }]}>
+                <Text
+                  style={[styles.formBtnText, { color: colors.mutedForeground }]}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleAddCommand}
+                onPress={handleAddCmd}
                 style={[
                   styles.formBtn,
-                  { backgroundColor: colors.primary, borderColor: colors.primary },
+                  { backgroundColor: colors.techBlue, borderColor: colors.techBlue },
                 ]}
               >
                 <Text
-                  style={[styles.formBtnText, { color: colors.primaryForeground }]}
+                  style={[
+                    styles.formBtnText,
+                    { color: colors.background },
+                  ]}
                 >
                   Add
                 </Text>
@@ -427,28 +466,32 @@ export default function SettingsScreen() {
             onPress={() => setShowAddCommand(true)}
             style={[
               styles.addBtn,
-              { borderColor: colors.primary + "40", backgroundColor: colors.primary + "10" },
+              {
+                borderColor: colors.techBlue + "35",
+                backgroundColor: colors.techBlue + "08",
+              },
             ]}
           >
-            <Feather name="plus" size={18} color={colors.primary} />
-            <Text style={[styles.addBtnText, { color: colors.primary }]}>
+            <Feather name="plus" size={16} color={colors.techBlue} />
+            <Text style={[styles.addBtnText, { color: colors.techBlue }]}>
               Add Custom Command
             </Text>
           </TouchableOpacity>
         )}
 
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-          DATA
-        </Text>
+        <SectionHeader title="// DATA" />
         <TouchableOpacity
-          onPress={handleClearHistory}
+          onPress={confirmClearHistory}
           style={[
             styles.dangerBtn,
-            { backgroundColor: colors.destructive + "15", borderColor: colors.destructive + "30" },
+            {
+              backgroundColor: colors.destructive + "12",
+              borderColor: colors.destructive + "28",
+            },
           ]}
         >
-          <Feather name="trash" size={16} color={colors.destructive} />
-          <Text style={[styles.dangerBtnText, { color: colors.destructive }]}>
+          <Feather name="trash" size={15} color={colors.destructive} />
+          <Text style={[styles.dangerText, { color: colors.destructive }]}>
             Clear Conversation History
           </Text>
         </TouchableOpacity>
@@ -463,52 +506,50 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-  },
-  scroll: { paddingHorizontal: 20, paddingTop: 16, gap: 10 },
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1.5,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  fieldRow: {
+  headerTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16, gap: 8 },
+  sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 1.5,
+  },
+  sectionLine: { flex: 1, height: 1 },
+  editRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
   },
-  fieldInfo: { flex: 1, gap: 2 },
-  fieldLabel: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.5 },
-  fieldValue: { fontSize: 16, fontFamily: "Inter_400Regular" },
-  fieldInput: {
-    fontSize: 16,
-    fontFamily: "Inter_400Regular",
-    padding: 0,
-    margin: 0,
-  },
-  editButtons: { flexDirection: "row", gap: 6 },
-  editBtn: {
-    width: 32,
-    height: 32,
+  editRowLeft: { flex: 1, gap: 2 },
+  editLabel: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.5 },
+  editValue: { fontSize: 15, fontFamily: "Inter_400Regular" },
+  editInput: { fontSize: 15, fontFamily: "Inter_400Regular", padding: 0 },
+  editActions: { flexDirection: "row", gap: 6 },
+  miniBtn: {
+    width: 30,
+    height: 30,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -516,113 +557,106 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    padding: 14,
+    gap: 10,
   },
-  cardLabel: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.5 },
-  voiceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  voiceChip: {
+  cardHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
-  voiceChipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  promptInput: {
-    fontSize: 14,
+  chipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  promptArea: {
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    lineHeight: 20,
-    borderRadius: 8,
+    lineHeight: 19,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 12,
-    minHeight: 100,
+    minHeight: 90,
     textAlignVertical: "top",
   },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
     borderRadius: 12,
     borderWidth: 1,
   },
+  switchInfo: { flex: 1, gap: 2 },
   switchLabel: { fontSize: 15, fontFamily: "Inter_500Medium" },
-  switchDesc: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
-  hintText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginBottom: 4,
+  switchSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  hintCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  commandRow: {
+  hintText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  cmdRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 12,
-  },
-  commandInfo: { flex: 1, gap: 2 },
-  commandTrigger: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  commandDesc: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  commandAction: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addCommandForm: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
     gap: 10,
   },
-  addFormTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 4,
+  cmdInfo: { flex: 1, gap: 3 },
+  cmdTrigger: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  cmdDesc: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  addForm: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
   },
+  addFormTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   addInput: {
-    height: 44,
+    height: 42,
     borderRadius: 10,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 15,
+    paddingHorizontal: 12,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
-  addFormButtons: { flexDirection: "row", gap: 10 },
+  addFormBtns: { flexDirection: "row", gap: 8 },
   formBtn: {
     flex: 1,
-    height: 44,
+    height: 42,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  formBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  formBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 48,
+    height: 46,
     borderRadius: 12,
     borderWidth: 1,
     borderStyle: "dashed",
   },
-  addBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  addBtnText: { fontSize: 14, fontFamily: "Inter_500Medium" },
   dangerBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 48,
+    height: 46,
     borderRadius: 12,
     borderWidth: 1,
   },
-  dangerBtnText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  dangerText: { fontSize: 14, fontFamily: "Inter_500Medium" },
 });

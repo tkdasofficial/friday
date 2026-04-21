@@ -1,77 +1,61 @@
 const colors = {
   light: {
-    text: "#E8F4FF",
-    tint: "#00D4FF",
-
-    background: "#050A1A",
-    foreground: "#E8F4FF",
-
-    card: "#0D1B2E",
-    cardForeground: "#E8F4FF",
-
-    primary: "#00D4FF",
-    primaryForeground: "#050A1A",
-
-    secondary: "#0A1628",
-    secondaryForeground: "#A8C8E8",
-
-    muted: "#0D1B2E",
-    mutedForeground: "#5A7A9A",
-
-    accent: "#00D4FF",
-    accentForeground: "#050A1A",
-
+    text: "#E2EEFF",
+    tint: "#3B9EFF",
+    background: "#03060F",
+    foreground: "#E2EEFF",
+    card: "#080F1E",
+    cardForeground: "#E2EEFF",
+    primary: "#3B9EFF",
+    primaryForeground: "#03060F",
+    secondary: "#0C1526",
+    secondaryForeground: "#8BAED4",
+    muted: "#0C1526",
+    mutedForeground: "#4A6A8A",
+    accent: "#0EA5E9",
+    accentForeground: "#03060F",
     destructive: "#FF3366",
     destructiveForeground: "#ffffff",
-
-    border: "#1A2F4A",
-    input: "#0D1B2E",
-
-    success: "#00FF88",
-    warning: "#FFB800",
-
-    glowBlue: "#00D4FF",
-    glowPurple: "#7B2FFF",
-    glowGreen: "#00FF88",
+    border: "#112035",
+    input: "#0C1526",
+    success: "#00E5A0",
+    warning: "#FFB020",
+    techBlue: "#3B9EFF",
+    techBlueDim: "#1A5A9E",
+    techBlueGlow: "#3B9EFF",
+    cyberGreen: "#00E5A0",
+    neonPurple: "#7C3AED",
+    scanLine: "#3B9EFF18",
   },
-
   dark: {
-    text: "#E8F4FF",
-    tint: "#00D4FF",
-
-    background: "#050A1A",
-    foreground: "#E8F4FF",
-
-    card: "#0D1B2E",
-    cardForeground: "#E8F4FF",
-
-    primary: "#00D4FF",
-    primaryForeground: "#050A1A",
-
-    secondary: "#0A1628",
-    secondaryForeground: "#A8C8E8",
-
-    muted: "#0D1B2E",
-    mutedForeground: "#5A7A9A",
-
-    accent: "#00D4FF",
-    accentForeground: "#050A1A",
-
+    text: "#E2EEFF",
+    tint: "#3B9EFF",
+    background: "#03060F",
+    foreground: "#E2EEFF",
+    card: "#080F1E",
+    cardForeground: "#E2EEFF",
+    primary: "#3B9EFF",
+    primaryForeground: "#03060F",
+    secondary: "#0C1526",
+    secondaryForeground: "#8BAED4",
+    muted: "#0C1526",
+    mutedForeground: "#4A6A8A",
+    accent: "#0EA5E9",
+    accentForeground: "#03060F",
     destructive: "#FF3366",
     destructiveForeground: "#ffffff",
-
-    border: "#1A2F4A",
-    input: "#0D1B2E",
-
-    success: "#00FF88",
-    warning: "#FFB800",
-
-    glowBlue: "#00D4FF",
-    glowPurple: "#7B2FFF",
-    glowGreen: "#00FF88",
+    border: "#112035",
+    input: "#0C1526",
+    success: "#00E5A0",
+    warning: "#FFB020",
+    techBlue: "#3B9EFF",
+    techBlueDim: "#1A5A9E",
+    techBlueGlow: "#3B9EFF",
+    cyberGreen: "#00E5A0",
+    neonPurple: "#7C3AED",
+    scanLine: "#3B9EFF18",
   },
-
-  radius: 16,
+  radius: 14,
 };
 
 export default colors;
