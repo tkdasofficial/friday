@@ -16,11 +16,11 @@ paths = [ "/" ]
 localPort = 24291
 
 [services.development]
-run = "pnpm --filter @workspace/friday run dev"
+run = "npm run dev --workspace=@workspace/friday"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/friday", "run", "build" ]
-run = [ "pnpm", "--filter", "@workspace/friday", "run", "serve" ]
+build = [ "npm", "run", "build", "--workspace=@workspace/friday" ]
+run = [ "npm", "run", "serve", "--workspace=@workspace/friday" ]
 
 [services.env]
 PORT = "24291"
