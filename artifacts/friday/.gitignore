@@ -9,15 +9,37 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
-ios/
-android/
+# Native — keep source, ignore build artifacts/local files
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# Android build artifacts (keep android/ folder tracked)
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/app/release/
+android/captures/
+android/*.iml
+android/app/*.iml
+android/.cxx/
+android/app/.cxx/
+*.hprof
+*.keystore
+!android/app/debug.keystore
+
+# iOS build artifacts (keep ios/ folder tracked when generated)
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Podfile.lock
 
 # Metro
 .metro-health-check*
