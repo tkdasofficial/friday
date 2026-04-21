@@ -34,7 +34,6 @@
     },
     "android": {
       "package": "com.friday.assistant",
-      "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_CONTACTS",
