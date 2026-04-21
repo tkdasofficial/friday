@@ -1,0 +1,13 @@
+{
+  "name": "friday-core",
+  "version": "1.0.0",
+  "description": "Native Android (Kotlin) voicebot core for FRIDAY: continuous SpeechRecognizer, native TTS, foreground service, wake-word, command router.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

@@ -1,5 +1,8 @@
 import * as Speech from "expo-speech";
 import { Platform } from "react-native";
+import { FridayCore, isNativeAvailable } from "friday-core";
+
+const useNative = (): boolean => Platform.OS === "android" && isNativeAvailable();
 
 export type VoicePersona = "sweet" | "warm" | "bright" | "calm" | "natural";
 
@@ -65,6 +68,17 @@ export function setVoicePrefs(prefs: Partial<VoicePrefs>): void {
   // Force re-pick on next speak if persona/language changed
   if (prefs.language || prefs.voiceId) {
     selectedVoiceCache.clear();
+  }
+  if (useNative()) {
+    const persona = currentPrefs.persona;
+    const preset = PERSONA_PRESETS[persona];
+    FridayCore.setVoicePrefs({
+      pitch: currentPrefs.pitch ?? preset.pitch,
+      rate: currentPrefs.rate ?? preset.rate,
+      locale: currentPrefs.language,
+      preferFemale: true,
+      voiceName: currentPrefs.voiceId,
+    }).catch(() => {});
   }
 }
 
@@ -270,10 +284,32 @@ async function processQueue() {
 }
 
 export async function speak(text: string, opts: SpeechOptions = {}): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const cleanText = shapeText(text);
-    if (!cleanText) { resolve(); return; }
+  const cleanText = shapeText(text);
+  if (!cleanText) return;
 
+  // Native Android path: hand the entire utterance to the Kotlin TTS engine.
+  if (useNative()) {
+    try {
+      opts.onStart?.();
+      const persona = opts.persona ?? currentPrefs.persona;
+      const preset = PERSONA_PRESETS[persona];
+      await FridayCore.speak(cleanText, {
+        pitch: opts.pitch ?? currentPrefs.pitch ?? preset.pitch,
+        rate: opts.rate ?? currentPrefs.rate ?? preset.rate,
+        locale: opts.language ?? currentPrefs.language,
+        preferFemale: true,
+        voiceName: opts.voice ?? currentPrefs.voiceId,
+      });
+      opts.onDone?.();
+      return;
+    } catch (e: any) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      opts.onError?.(err);
+      throw err;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
     speakQueue.push({
       text: cleanText,
       opts: {
@@ -287,7 +323,9 @@ export async function speak(text: string, opts: SpeechOptions = {}): Promise<voi
 }
 
 export function stopSpeaking() {
-  if (Platform.OS === "web") {
+  if (useNative()) {
+    FridayCore.stopSpeaking().catch(() => {});
+  } else if (Platform.OS === "web") {
     try { window.speechSynthesis?.cancel(); } catch {}
   } else {
     Speech.stop();
